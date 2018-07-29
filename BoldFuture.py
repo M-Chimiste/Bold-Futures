@@ -10,11 +10,11 @@ class TerrBot(sc2.BotAI):
     
     async def on_step(self, iteration):
         # As each step occurs do the following:
-        await self.distribute_workers() # Will take workers and distribute them.
-        await self.build_workers() # Start making new workers
-        await self.build_supplydepots() # Start making supply depots to allow for more units
-        await self.expand()
-        await self.build_refinery()
+        await self.distribute_workers()  # Will take workers and distribute them.
+        await self.build_workers()  # Start making new workers
+        await self.build_supplydepots()  # Start making supply depots to allow for more units
+        await self.expand()  # Expands the AI base
+        await self.build_refinery()  # Builds a refinery on a vespene gas drop
     
 
     # Function to build workers (SCVs)
@@ -24,6 +24,7 @@ class TerrBot(sc2.BotAI):
                 await self.do(cmdCenter.train(SCV))
     
 
+    # Function to build supply depots
     async def build_supplydepots(self):
         if self.supply_left < 5 and not self.already_pending(SUPPLYDEPOT):
             cmdCenter = self.units(COMMANDCENTER).ready
@@ -32,11 +33,14 @@ class TerrBot(sc2.BotAI):
                     await self.build(SUPPLYDEPOT, near=cmdCenter.first)
 
     
+    # Function to trigger an expansion of the base
+    #TODO will need to evaluate logic for when to expand
     async def expand(self):
         if self.units(COMMANDCENTER).amount < 2 and self.can_afford(COMMANDCENTER):
             await self.expand_now()
     
 
+    # Function to evaluate location and build refinery on vespene gas drops
     async def build_refinery(self):
         for cmdCenter in self.units(COMMANDCENTER).ready:
             vespeneGas = self.state.vespene_geyser.closer_than(25.0, cmdCenter)
