@@ -1,6 +1,7 @@
 # StarCraft II Bot AI
 # AI Class is Terran
 import sc2
+import random
 from sc2 import run_game, maps, Race, Difficulty
 from sc2.player import Bot, Computer
 from sc2.constants import *
@@ -16,7 +17,9 @@ class Botty(sc2.BotAI):
         await self.expand()  # Expands the AI base
         await self.build_refinery()  # Builds a refinery on a vespene gas drop
         await self.build_offensive_bldgs() #
-        await self.build_army()   #Start making marines and tanks
+        await self.build_army()   # Start making marines and tanks
+        await self.attack_baddies()  # Take the army and go attack bad guys
+
     
 
     # quick and dirty function that will allow for checking if things are upgraded...
@@ -37,11 +40,12 @@ class Botty(sc2.BotAI):
     # Function to build supply depots
     async def build_supplydepots(self):
         if self.supply_left < 5 and not self.already_pending(SUPPLYDEPOT):  
-            cmdCenter = self.units(COMMANDCENTER).ready
-            if cmdCenter.exists:
-                cc = cmdCenter.first
-                if self.can_afford(SUPPLYDEPOT):
-                    await self.build(SUPPLYDEPOT, near=cc.position.towards(self.game_info.map_center, 5))  #potentially better strategy for placement?
+            if self.can_afford(SUPPLYDEPOT)
+                cmdCenter = self.units(COMMANDCENTER).ready
+                if cmdCenter.exists:
+                    cc = cmdCenter.first
+                    if self.can_afford(SUPPLYDEPOT):
+                        await self.build(SUPPLYDEPOT, near=cc.position.towards(self.game_info.map_center, 5))  #potentially better strategy for placement?
 
     
     # Function to trigger an expansion of the base
@@ -95,8 +99,6 @@ class Botty(sc2.BotAI):
                     await self.do(factory.build(FACTORYTECHLAB))
         
 
-
-
     # Function to start generating offensive units
     async def build_army(self):
         marines = float(len(self.units(MARINE)))
@@ -111,8 +113,37 @@ class Botty(sc2.BotAI):
                     if self.can_afford(SIEGETANK) and self.supply_left > 0:
                         await self.do(factory.train(SIEGETANK))
 
+    # Function to find baddies
+    def find_target(self, state):
+        if len(self.known_enemy_units) > 0:
+            return random.choice(self.known_enemy_units)
+        elif len(self.known_enemy_structures) > 0:
+            return random.choice(self.known_enemy_structures)
+        else:
+            return self.enemy_start_locations[0]
+
+
+    # Function to attack bad guys
+    async def attack_baddies(self):
+        # Conduct a raid
+        if self.units(MARINE).amount > 5 and self.units(SIEGETANK).amount >= 0:
+            if len(self.known_enemy_units) > 0:
+                for m in self.units(MARINE).idle:
+                    await self.do(m.attack(self.find_target(self.state)))
+                for t in self.units(SIEGETANK):
+                    await self.do(t.attack(self.find_target(self.state)))
+        
+        # Conduct a battle
+        if self.units(MARINE).amount > 14 and self.units(SIEGETANK).amount > 3:
+            for m in self.units(MARINE).idle:
+                    await self.do(m.attack(self.find_target(self.state)))
+            for t in self.units(SIEGETANK):
+                await self.do(t.attack(self.find_target(self.state)))
+    
+
+
 
 
 run_game(maps.get("Abyssal Reef LE"), [
     Bot(Race.Terran, Botty()), Computer(Race.Protoss, Difficulty.Easy)
-], realtime=False)
+], realtime=True)
