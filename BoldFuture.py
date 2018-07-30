@@ -81,7 +81,7 @@ class Botty(sc2.BotAI):
             if self.units(BARRACKS).exists and self.units(BARRACKS).amount < 3:
                 barracks = self.units(BARRACKS).ready.random
                 if self.can_afford(BARRACKS) and not self.already_pending(BARRACKS):
-                    await self.build(BARRACKS, near=barracks.position.towards(self.game_info.map_center, -5)
+                    await self.build(BARRACKS, near=barracks.position.towards(self.game_info.map_center, -5))
 
         if self.units(BARRACKS).ready.exists:  #Invalid syntax error TODO FIX... why?
             barracks = self.units(SUPPLYDEPOT).ready.random # pick a random supply depot to build by
@@ -91,7 +91,7 @@ class Botty(sc2.BotAI):
             if self.units(FACTORY).exists and self.units(FACTORY).amount < 3:
                 factory = self.units(FACTORY).ready.random
                 if self.can_afford(FACTORY) and not self.already_pending(FACTORY):
-                    await self.build(FACTORY, near=factory.position.towards(self.game_info.map_center, -5)
+                    await self.build(FACTORY, near=factory.position.towards(self.game_info.map_center, -5))
 
     async def upgrade_building(self):
         if self.units(BARRACKS).ready.exists and self.units(FACTORY).ready.exists:
