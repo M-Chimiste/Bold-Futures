@@ -19,7 +19,7 @@ class Botty(sc2.BotAI):
         await self.build_offensive_bldgs() #
         await self.build_army()   # Start making marines and tanks
         await self.attack_baddies()  # Take the army and go attack bad guys
-
+        await self.upgrade_building()
     
 
     # quick and dirty function that will allow for checking if things are upgraded...
@@ -31,21 +31,22 @@ class Botty(sc2.BotAI):
 
     # Function to build workers (SCVs)
     async def build_workers(self):
-        for cmdCenter in self.units(COMMANDCENTER).ready.noqueue:
-            SCVs = len(self.units(SCV))
-            if self.can_afford(SCV) and SCVs < 75:  #Spam SCVs if under 75
-                await self.do(cmdCenter.train(SCV))
+        if self.can_afford(SCV):
+            for cmdCenter in self.units(COMMANDCENTER).ready.noqueue:
+                SCVs = len(self.units(SCV))
+                if self.can_afford(SCV) and SCVs < 75:  #Spam SCVs if under 75
+                    await self.do(cmdCenter.train(SCV))
     
 
     # Function to build supply depots
     async def build_supplydepots(self):
         if self.supply_left < 5 and not self.already_pending(SUPPLYDEPOT):  
-            if self.can_afford(SUPPLYDEPOT)
+            if self.can_afford(SUPPLYDEPOT):
                 cmdCenter = self.units(COMMANDCENTER).ready
                 if cmdCenter.exists:
-                    cc = cmdCenter.first
+                    cc = cmdCenter.random
                     if self.can_afford(SUPPLYDEPOT):
-                        await self.build(SUPPLYDEPOT, near=cc.position.towards(self.game_info.map_center, 5))  #potentially better strategy for placement?
+                        await self.build(SUPPLYDEPOT, near=cc.position.towards(self.game_info.map_center, 15))  #potentially better strategy for placement?
 
     
     # Function to trigger an expansion of the base
@@ -58,7 +59,7 @@ class Botty(sc2.BotAI):
     # Function to evaluate location and build refinery on vespene gas drops
     async def build_refinery(self):
         for cmdCenter in self.units(COMMANDCENTER).ready:
-            vespeneGas = self.state.vespene_geyser.closer_than(25.0, cmdCenter)
+            vespeneGas = self.state.vespene_geyser.closer_than(15.0, cmdCenter)
             for vespene in vespeneGas:
                 if not self.can_afford(REFINERY):
                     break
@@ -74,18 +75,25 @@ class Botty(sc2.BotAI):
         # build a barracks first
         if self.units(SUPPLYDEPOT).ready.exists:
             supplyDepot = self.units(SUPPLYDEPOT).ready.random # pick a random supply depot to build by
-            if not self.units(BARRACKS):
+            if not self.units(BARRACKS).exists:
                 if self.can_afford(BARRACKS) and not self.already_pending(BARRACKS):
-                    await self.build(BARRACKS, near=supplyDepot)
-        
+                    await self.build(BARRACKS, near=supplyDepot.position.towards(self.game_info.map_center,-4))
+            if self.units(BARRACKS).exists and self.units(BARRACKS).amount < 3:
+                barracks = self.units(BARRACKS).ready.random
+                if self.can_afford(BARRACKS) and not self.already_pending(BARRACKS):
+                    await self.build(BARRACKS, near=barracks.position.towards(self.game_info.map_center, -5)
 
-        # build a factory if we have a barracks
-        if self.units(SUPPLYDEPOT).ready.exists and self.units(BARRACKS).ready.exists:
-            barracks = self.units(BARRACKS).ready.random # pick a random barracks to build by
-            if not self.units(FACTORY):
+        if self.units(BARRACKS).ready.exists:  #Invalid syntax error TODO FIX... why?
+            barracks = self.units(SUPPLYDEPOT).ready.random # pick a random supply depot to build by
+            if not self.units(FACTORY).exists:
                 if self.can_afford(FACTORY) and not self.already_pending(FACTORY):
-                    await self.build(FACTORY, near=barracks)
+                    await self.build(FACTORY, near=barracks.position.towards(self.game_info.map_center,-4))
+            if self.units(FACTORY).exists and self.units(FACTORY).amount < 3:
+                factory = self.units(FACTORY).ready.random
+                if self.can_afford(FACTORY) and not self.already_pending(FACTORY):
+                    await self.build(FACTORY, near=factory.position.towards(self.game_info.map_center, -5)
 
+    async def upgrade_building(self):
         if self.units(BARRACKS).ready.exists and self.units(FACTORY).ready.exists:
             for barracks in self.units(BARRACKS).ready:
                 if self.already_pending(BARRACKSTECHLAB):
@@ -126,7 +134,7 @@ class Botty(sc2.BotAI):
     # Function to attack bad guys
     async def attack_baddies(self):
         # Conduct a raid
-        if self.units(MARINE).amount > 5 and self.units(SIEGETANK).amount >= 0:
+        if self.units(MARINE).amount > 3 and self.units(SIEGETANK).amount >= 0:
             if len(self.known_enemy_units) > 0:
                 for m in self.units(MARINE).idle:
                     await self.do(m.attack(self.find_target(self.state)))
@@ -134,7 +142,7 @@ class Botty(sc2.BotAI):
                     await self.do(t.attack(self.find_target(self.state)))
         
         # Conduct a battle
-        if self.units(MARINE).amount > 14 and self.units(SIEGETANK).amount > 3:
+        if self.units(MARINE).amount > 5 and self.units(SIEGETANK).amount > 1:
             for m in self.units(MARINE).idle:
                     await self.do(m.attack(self.find_target(self.state)))
             for t in self.units(SIEGETANK):
@@ -146,4 +154,4 @@ class Botty(sc2.BotAI):
 
 run_game(maps.get("Abyssal Reef LE"), [
     Bot(Race.Terran, Botty()), Computer(Race.Protoss, Difficulty.Easy)
-], realtime=True)
+], realtime=False)
