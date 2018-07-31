@@ -16,7 +16,7 @@ class Botty(sc2.BotAI):
         await self.build_supplydepots()  # Start making supply depots to allow for more units
         await self.build_refinery()  # Builds a refinery on a vespene gas drop       
         await self.build_offensive_bldgs() # Makes a factory or a barracks  
-        await self.build_army()   # Start making marines and tanks
+        await self.build_army()   # Start making reapers and tanks
         await self.attack_baddies()  # Take the army and go attack bad guys/ TODO make more robust
         await self.upgrade_building()
         await self.expand()  # Expands the AI base
@@ -87,7 +87,7 @@ class Botty(sc2.BotAI):
         # build a barracks first
         if self.units(SUPPLYDEPOT).ready.exists:
             supplyDepot = self.units(SUPPLYDEPOT).ready.random # pick a random supply depot to build by
-            if not self.units(BARRACKS).exists or self.units(BARRACKS).amount < 3:
+            if not self.units(BARRACKS).exists or self.units(BARRACKS).amount < 5:
                 if self.can_afford(BARRACKS) and not self.already_pending(BARRACKS):
                     try:
                         await self.build(BARRACKS, near=supplyDepot.position.towards(self.game_info.map_center,-3))
@@ -97,7 +97,7 @@ class Botty(sc2.BotAI):
 
         if self.units(BARRACKS).ready.exists:  #Invalid syntax error TODO FIX... why?
             barracks = self.units(SUPPLYDEPOT).ready.random # pick a random supply depot to build by
-            if not self.units(FACTORY).exists or self.units(BARRACKS).amount < 3:
+            if not self.units(FACTORY).exists or self.units(BARRACKS).amount < 5:
                 if self.can_afford(FACTORY) and not self.already_pending(FACTORY):
                     try:
                         await self.build(FACTORY, near=barracks.position.towards(self.game_info.map_center,-10))
@@ -182,4 +182,4 @@ class Botty(sc2.BotAI):
 
 run_game(maps.get("Abyssal Reef LE"), [
     Bot(Race.Terran, Botty()), Computer(Race.Protoss, Difficulty.Easy)
-], realtime=False)
+], realtime=True)
