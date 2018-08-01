@@ -18,9 +18,9 @@ class Botty(sc2.BotAI):
         await self.build_offensive_bldgs() # Makes a factory or a barracks  
         await self.build_army()   # Start making reapers and tanks
         await self.attack_baddies()  # Take the army and go attack bad guys/ TODO make more robust
-        await self.upgrade_building()
+        await self.upgrade_building() # will try to upgrade buildings
         await self.expand()  # Expands the AI base
-    
+        await self.upgrade_units()
 
     # quick and dirty function that will allow for checking if things are upgraded...
     def add_on_name(self, structure):
@@ -130,24 +130,33 @@ class Botty(sc2.BotAI):
     async def build_army(self):
         reaper = float(len(self.units(REAPER)))
         tanks = float(len(self.units(SIEGETANK)))
+        marines = float(len(self.units(MARINE)))
+
         if self.units(BARRACKS).ready.exists:
             for barracks in self.units(BARRACKS).ready.noqueue:
                 if not self.can_afford(REAPER):
                     break
                 if self.can_afford(REAPER) and self.supply_left > 0:
-                    try:
+                    if (marines > reaper):
                         await self.do(barracks.train(REAPER))
-                    except:
-                        print("Tried and failed to make a Reaper")
-        if self.units(FACTORY).ready.exists and self.can_afford(HELLION):
+        
+        if self.units(BARRACKS).ready.exists:
+            for barracks in self.units(BARRACKS).ready.noqueue:
+                if not self.can_afford(MARINE):
+                    break
+                if self.can_afford(MARINE) and self.supply_left > 0:
+                    if (reaper > marines):
+                        await self.do(barracks.train(MARINE))
+                    if reaper == marines:
+                        await self.do(barracks.train(MARINE))
+        
+        
+        if self.units(FACTORY).ready.exists and self.can_afford(SIEGETANK):
             for factory in self.units(FACTORY).ready.noqueue:
-                if (tanks/reaper) < 0.33:  # May need tweaking, randomly assigned
-                    if self.can_afford(HELLION) and self.supply_left > 0:
-                        try:
-                            await self.do(factory.train(HELLION))
-                        except:
-                            print("Tried and failed to make a Hellion")
-                            pass
+                if self.can_afford(SIEGETANK) and self.supply_left > 0:
+                    await self.do(factory.train(SIEGETANK))
+    
+                        
 
     # Function to find baddies
     def find_target(self, state):
@@ -162,19 +171,50 @@ class Botty(sc2.BotAI):
     # Function to attack bad guys
     async def attack_baddies(self):
         # Conduct a raid
-        if self.units(REAPER).amount > 3 and self.units(HELLION).amount >= 0:
+        if self.units(REAPER).amount > 3 and self.units(SIEGETANK).amount >= 0:
             if len(self.known_enemy_units) > 0:
                 for m in self.units(REAPER).idle:
                     await self.do(m.attack(self.find_target(self.state)))
-                for t in self.units(HELLION):
+                for t in self.units(SIEGETANK).idle:
                     await self.do(t.attack(self.find_target(self.state)))
+                for r in self.units(MARINE).idle:
+                    await self.do(r.attack(self.find_target(self.state)))
         
         # Conduct a battle
-        if self.units(REAPER).amount > 5 and self.units(HELLION).amount > 1:
+        if self.units(REAPER).amount > 5 and self.units(SIEGETANK).amount > 1:
             for m in self.units(REAPER).idle:
                     await self.do(m.attack(self.find_target(self.state)))
-            for t in self.units(HELLION):
+            for r in self.units(MARINE).idle:
+                await self.do(r.attack(self.find_target(self.state)))
+            for t in self.units(SIEGETANK).idle:
                 await self.do(t.attack(self.find_target(self.state)))
+    
+    # Maybe upgrade a unit/crash the bot.
+    async def upgrade_units(self):
+        for tech_lab in self.units(BARRACKSTECHLAB).ready:
+            abilities = await self.get_available_abilities(tech_lab)
+            if AbilityId.RESEARCH_CONCUSSIVESHELLS in abilities and self.can_afford(RESEARCH_CONCUSSIVESHELLS):
+                await self.do(tech_lab(AbilityId.RESEARCH_CONCUSSIVESHELLS))
+        
+
+        for tech_lab in self.units(BARRACKSTECHLAB).ready:
+            abilities = await self.get_available_abilities(tech_lab)
+            if AbilityId.RESEARCH_COMBATSHIELD in abilities and self.can_afford(RESEARCH_COMBATSHIELD):
+                await self.do(tech_lab(AbilityId.RESEARCH_COMBATSHIELD))
+        
+
+        for tech_lab in self.units(BARRACKSTECHLAB).ready:
+            abilities = await self.get_available_abilities(tech_lab)
+            if AbilityId.BARRACKSTECHLABRESEARCH_STIMPACK in abilities and self.can_afford(BARRACKSTECHLABRESEARCH_STIMPACK):
+                await self.do(tech_lab(AbilityId.BARRACKSTECHLABRESEARCH_STIMPACK))
+
+
+        for tech_lab in self.units(FACTORYTECHLAB).ready:
+            abilities = await self.get_available_abilities(tech_lab)
+            if AbilityId.RESEARCH_SMARTSERVOS in abilities and self.can_afford(RESEARCH_SMARTSERVOS):
+                await self.do(tech_lab(AbilityId.RESEARCH_SMARTSERVOS))
+        
+
     
 
 
