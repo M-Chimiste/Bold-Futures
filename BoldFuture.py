@@ -1,19 +1,19 @@
 # StarCraft II Bot AI
 # AI Class is Protoss
-import sc2
-import random
-from sc2 import run_game, maps, Race, Difficulty
-from sc2.player import Bot, Computer
-from sc2.constants import *
-import random
 import cv2
+import keras
 import time
 import math
 import numpy as np
 import os
-import keras
+import random
+import sc2
+from sc2 import run_game, maps, Race, Difficulty, Result
+from sc2.player import Bot, Computer
+from sc2 import position
+from sc2.constants import *
 
-
+os.environ["SC2PATH"] = 'J:/Blizzard/StarCraft II'
 HEADLESS = False
 
 
@@ -24,9 +24,11 @@ class Botty(sc2.BotAI):
         self.use_model = use_model
         self.title = title
         self.scoutingReport = {}
-
+        self.do_something_after = 0
+        
+        
         # Bot's possible choices
-        self.choice = {
+        self.choices = {
             0: self.build_workers,
             1: self.build_pylons,
             2: self.attack_known_enemy_unit,
@@ -42,7 +44,8 @@ class Botty(sc2.BotAI):
             12: self.defend_nexus,
             13: self.build_stargate,
             14: self.build_cybernetics,
-            15: self.build_colossus
+            15: self.build_colossus,
+            16: self.build_robotics_bay
         }
         self.trainingData = []
 
@@ -54,15 +57,16 @@ class Botty(sc2.BotAI):
     def on_end(self, game_result):
         print('---Game On End Called---')
         print(game_result, self.use_model)
-        with open("gameout-random-vs-medium.txt", 'a') as f:
+        with open("gameout-random-vs-easy.txt", 'a') as f:
             if self.use_model:
                 f.write("Model {} - {}\n".format(game_result, int(time.time())))
             else:
                 f.write("Random {} -{}\n".format(game_result, int(time.time())))
-
+        if game_result == Result.Victory:
+            np.save("train_data/{}.npy".format(str(int(time.time()))), np.array(self.train_data))
     
     async def on_step(self, iteration):
-        self.time = (seld.state.game_loop/22.4) / 60 # helps keep track of time (even if not in real time)
+        self.time = (self.state.game_loop/22.4) / 60 # helps keep track of time (even if not in real time)
         # As each step occurs do the following:
         await self.distribute_workers()  # Will take workers and distribute them.
         await self.scout()
@@ -88,50 +92,53 @@ class Botty(sc2.BotAI):
         if y > self.game_info.map_size[1]:
             y = self.game_info.map_size[1]
         
-        randPos = position.Point2(position.Pointlike((x,y)))
-        return randPos
+        go_to = position.Point2(position.Pointlike((x,y)))
+        return go_to
         
     
     async def scout(self):
-        self.expand_dis_dir = {}
-        for i in self.expansion_locations:
-            distance_to_enemy_start = i.distance_to(self.enemy_start_locations[0])
-            self.expand_dis_dir[distance_to_enemy_start] = i
         
+        self.expand_dis_dir = {}
+
+        for el in self.expansion_locations:
+            distance_to_enemy_start = el.distance_to(self.enemy_start_locations[0])
+            #print(distance_to_enemy_start)
+            self.expand_dis_dir[distance_to_enemy_start] = el
+
         self.ordered_exp_distances = sorted(k for k in self.expand_dis_dir)
 
         existing_ids = [unit.tag for unit in self.units]
-        removed_units = []
-        for scouts in self.scoutingReport:
-            if scouts not in existing_ids:
-                removed_units.append(scouts)
-        
-        for scout in removed_units:
+        # removing of scouts that are actually dead now.
+        to_be_removed = []
+        for noted_scout in self.scoutingReport:
+            if noted_scout not in existing_ids:
+                to_be_removed.append(noted_scout)
+
+        for scout in to_be_removed:
             del self.scoutingReport[scout]
-        
-        # Check if we can use observers
+
         if len(self.units(ROBOTICSFACILITY).ready) == 0:
             unit_type = PROBE
             unit_limit = 1
         else:
             unit_type = OBSERVER
             unit_limit = 15
-        
+
         assign_scout = True
 
-        # Assign scout tag as false to all probes before drafting one into service.  We only want one after all.
         if unit_type == PROBE:
             for unit in self.units(PROBE):
                 if unit.tag in self.scoutingReport:
                     assign_scout = False
-        
+
         if assign_scout:
             if len(self.units(unit_type).idle) > 0:
                 for obs in self.units(unit_type).idle[:unit_limit]:
                     if obs.tag not in self.scoutingReport:
                         for dist in self.ordered_exp_distances:
                             try:
-                                location = next(value for key in self.expand_dis_dir.items() if key == dist)
+                                location = next(value for key, value in self.expand_dis_dir.items() if key == dist)
+                                # DICT {UNIT_ID:LOCATION}
                                 active_locations = [self.scoutingReport[k] for k in self.scoutingReport]
 
                                 if location not in active_locations:
@@ -144,13 +151,13 @@ class Botty(sc2.BotAI):
                                     self.scoutingReport[obs.tag] = location
                                     break
                             except Exception as e:
-                                print(e)
                                 pass
 
         for obs in self.units(unit_type):
             if obs.tag in self.scoutingReport:
                 if obs in [probe for probe in self.units(PROBE)]:
                     await self.do(obs.move(self.random_location_variance(self.scoutingReport[obs.tag])))
+
     
 
     async def intel(self):
@@ -178,7 +185,7 @@ class Botty(sc2.BotAI):
         for enemy_building in self.known_enemy_structures:
             position = enemy_building.position
             if enemy_building.name.lower() not in bases:
-                cv.circle(game_data, (int(position[0]), int(position[1])), 5, (200, 50, 212), -1)
+                cv2.circle(game_data, (int(position[0]), int(position[1])), 5, (200, 50, 212), -1)
         
         for enemy_building in self.known_enemy_structures:
             position = enemy_building.position
@@ -263,6 +270,13 @@ class Botty(sc2.BotAI):
             pylon = self.units(PYLON).ready.random # pick a random pylon to build by
             if self.can_afford(CYBERNETICSCORE) and not self.already_pending(CYBERNETICSCORE):
                 await self.build(CYBERNETICSCORE, near=pylon)
+    
+
+    async def build_robotics_bay(self):
+        if self.units(CYBERNETICSCORE).ready.exists: 
+            pylon = self.units(PYLON).ready.random # pick a random pylon to build by
+            if self.can_afford(ROBOTICSBAY) and not self.already_pending(ROBOTICSBAY):
+                await self.build(ROBOTICSBAY, near=pylon)
 
 
     async def build_stargate(self):
@@ -295,16 +309,16 @@ class Botty(sc2.BotAI):
 
         
     async def build_voidray(self):
-        stargate = self.units(STARTGATE).ready
+        stargate = self.units(STARGATE).ready
         if stargate.exists:
-            if self.can_afford(VOIDRAY) and supply_left > 0:            
+            if self.can_afford(VOIDRAY) and self.supply_left > 0:            
                 await self.do(random.choice(stargate).train(VOIDRAY))
 
 
     async def build_colossus(self):
         robotics = self.units(ROBOTICSFACILITY).ready
         if robotics.exits:
-            if self.can_afford(COLOSSUS) and supply_left > 0:
+            if self.can_afford(COLOSSUS) and self.supply_left > 0:
                 await self.do(random.choice(robotics).train(COLOSSUS))
     
     
@@ -312,7 +326,7 @@ class Botty(sc2.BotAI):
     async def build_observer(self):
         robotics = self.units(ROBOTICSFACILITY).ready
         if robotics.exits:
-            if self.can_afford(OBSERVER) and supply_left > 0:
+            if self.can_afford(OBSERVER) and self.supply_left > 0:
                 await self.do(random.choice(robotics).train(OBSERVER))
 
 
@@ -325,25 +339,14 @@ class Botty(sc2.BotAI):
     async def defend_nexus(self):
         if len(self.known_enemy_units) > 0:
             target = self.known_enemy_units.closest_to(random.choice(self.units(NEXUS)))
-            total_zealots = self.units(ZEALOT).amount
-            total_stalkers = self.units(STALKER).amount
-            total_voidray = self.units(VOIDRAY).amount
-            total_colossus = self.units(COLOSSUS).amount
-            total_army = total_zealots + total_stalkers + total_voidray + total_colossus
-            
-            #If there is nothing left go attack with everything you have
-            if total_army == 0:
-                for workers in self.units(PROBE):
-                    await self.do(workers.attack(target))
-            if total_army > 0:
-                for zealot in self.units(ZEALOT).idle:
-                    await self.do(zealot.attack(target))
-                for stalker in self.units(STALKER).idle:
-                    await self.do(stalker.attack(target))
-                for voidray in self.units(VOIDRAY).idle:
-                    await self.do(voidray.attack(target))
-                for colossus in self.units(COLOSSUS).idle:
-                    await self.do(colossus.attack(target))
+            for zealot in self.units(ZEALOT).idle:
+                await self.do(zealot.attack(target))
+            for stalker in self.units(STALKER).idle:
+                await self.do(stalker.attack(target))
+            for voidray in self.units(VOIDRAY).idle:
+                await self.do(voidray.attack(target))
+            for colossus in self.units(COLOSSUS).idle:
+                await self.do(colossus.attack(target))
     
 
     async def attack_known_enemy_structure(self):
@@ -378,17 +381,19 @@ class Botty(sc2.BotAI):
                 decision = self.model.predict([self.flipped.reshape([-1, 176, 200, 3])])
                 choice = np.argmax(decision[0])
             else:
-                choice = random.randrange(0,16)
+                choice = random.randrange(0,17)
             try:
                 await self.choices[choice]()
             except Exception as e:
                 print(str(e))
-            y = np.zeros(16)
+                print(self.choices[choice])
+            y = np.zeros(17)
             y[choice] = 1
             self.trainingData.append([y,self.flipped])
 
 
 
+
 run_game(maps.get("Abyssal Reef LE"), [
-    Bot(Race.Protoss, Botty(use_model=False, title=1)), Computer(Race.Terran, Difficulty.Medium)
+    Bot(Race.Protoss, Botty(use_model=False, title=1)), Computer(Race.Terran, Difficulty.Easy)
 ], realtime=False)
