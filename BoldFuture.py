@@ -14,7 +14,7 @@ from sc2 import position
 from sc2.constants import *
 
 os.environ["SC2PATH"] = 'J:/Blizzard/StarCraft II'
-HEADLESS = False
+HEADLESS = True
 
 
 class Botty(sc2.BotAI):
@@ -63,7 +63,10 @@ class Botty(sc2.BotAI):
             else:
                 f.write("Random {} -{}\n".format(game_result, int(time.time())))
         if game_result == Result.Victory:
-            np.save("train_data/{}.npy".format(str(int(time.time()))), np.array(self.train_data))
+            np.save("train_data/{}.npy".format(str(int(time.time()))), np.array(self.trainingData))
+            print("Victory!")
+        if game_result == Result.Defeat:
+            print('Defeat :(')
     
     async def on_step(self, iteration):
         self.time = (self.state.game_loop/22.4) / 60 # helps keep track of time (even if not in real time)
