@@ -1,7 +1,7 @@
 # StarCraft II Bot AI
 # AI Class is Protoss
 import cv2
-import keras
+#import keras
 import time
 import math
 import numpy as np
@@ -13,7 +13,8 @@ from sc2.player import Bot, Computer
 from sc2 import position
 from sc2.constants import *
 
-os.environ["SC2PATH"] = 'J:/Blizzard/StarCraft II'
+os.environ["SC2PATH"] = 'E:\Progams\Bilzzard\StarCraft II'
+
 HEADLESS = True
 
 
@@ -25,7 +26,7 @@ class Botty(sc2.BotAI):
         self.title = title
         self.scoutingReport = {}
         self.do_something_after = 0
-        
+        self.train_data = []
         
         # Bot's possible choices
         self.choices = {
@@ -47,10 +48,9 @@ class Botty(sc2.BotAI):
             15: self.build_colossus,
             16: self.build_robotics_bay
         }
-        self.trainingData = []
 
-        if self.use_model:
-            self.model = keras.model.load_model("Starcraft_Protoss_Model")
+        #if self.use_model:
+            #self.model = keras.model.load_model("Starcraft_Protoss_Model")
     
 
     # Record wins and losses
@@ -63,8 +63,10 @@ class Botty(sc2.BotAI):
             else:
                 f.write("Random {} -{}\n".format(game_result, int(time.time())))
         if game_result == Result.Victory:
-            np.save("train_data/{}.npy".format(str(int(time.time()))), np.array(self.trainingData))
-            print("Victory!")
+
+            filename = os.path.realpath(__file__) + "train_data/{}.npy".format(str(int(time.time())))
+            np.save(filename, np.array(self.train_data))    
+        
         if game_result == Result.Defeat:
             print('Defeat :(')
     
@@ -74,7 +76,7 @@ class Botty(sc2.BotAI):
         await self.distribute_workers()  # Will take workers and distribute them.
         await self.scout()
         await self.intel()
-        await self.do_stuff()
+        await self.do_something()
 
 
     # Function will take a location add variance to it "Randomly" then return the point
@@ -153,7 +155,7 @@ class Botty(sc2.BotAI):
                                     await self.do(obs.move(location))
                                     self.scoutingReport[obs.tag] = location
                                     break
-                            except Exception as e:
+                            except:
                                 pass
 
         for obs in self.units(unit_type):
@@ -378,29 +380,44 @@ class Botty(sc2.BotAI):
                 await self.do(colossus.attack(target))
 
 
-    async def do_stuff(self):
+    async def do_something(self):
+
         if self.time > self.do_something_after:
             if self.use_model:
-                decision = self.model.predict([self.flipped.reshape([-1, 176, 200, 3])])
-                choice = np.argmax(decision[0])
+                prediction = self.model.predict([self.flipped.reshape([-1, 176, 200, 3])])
+                choice = np.argmax(prediction[0])
             else:
-                choice = random.randrange(0,17)
+                worker_weight = 8
+                zealot_weight = 3
+                voidray_weight = 20
+                stalker_weight = 8
+                pylon_weight = 5
+                stargate_weight = 5
+                gateway_weight = 3
+
+                choice_weights = worker_weight*[0]+pylon_weight*[1]+1*[2]+1*[3]+1*[4]+gateway_weight*[5]+zealot_weight*[6]+stalker_weight*[7]+voidray_weight*[8]+1*[9]+1*[10]+1*[11]+1*[12]+stargate_weight*[13]+1*[14]+1*[15]+1*[16]
+                choice = random.choice(choice_weights)
+
+
             try:
                 await self.choices[choice]()
-            except:
-                pass
-                
+            except Exception as e:
+                print(str(e))
+
             y = np.zeros(17)
             y[choice] = 1
-            self.trainingData.append([y,self.flipped])
+            self.train_data.append([y, self.flipped])
 
 
 
 def main():
+
     run_game(maps.get("Abyssal Reef LE"), [
         Bot(Race.Protoss, Botty(use_model=False, title=1)), Computer(Race.Terran, Difficulty.Easy)
     ], realtime=False)
 
 if __name__ == '__main__':
+    
     for i in range(0,1000):
         main()
+        
