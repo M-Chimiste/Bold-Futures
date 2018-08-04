@@ -393,7 +393,7 @@ class Botty(sc2.BotAI):
 
 
 
-def main()
+def main():
     run_game(maps.get("Abyssal Reef LE"), [
         Bot(Race.Protoss, Botty(use_model=False, title=1)), Computer(Race.Terran, Difficulty.Easy)
     ], realtime=False)
