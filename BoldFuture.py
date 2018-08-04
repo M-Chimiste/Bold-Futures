@@ -384,9 +384,9 @@ class Botty(sc2.BotAI):
                 choice = random.randrange(0,17)
             try:
                 await self.choices[choice]()
-            except Exception as e:
-                print(str(e))
-                print(self.choices[choice])
+            except:
+                pass
+                
             y = np.zeros(17)
             y[choice] = 1
             self.trainingData.append([y,self.flipped])
