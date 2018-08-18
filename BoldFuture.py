@@ -13,7 +13,7 @@ from sc2.player import Bot, Computer
 from sc2 import position
 from sc2.constants import *
 
-os.environ["SC2PATH"] = 'E:\Progams\Bilzzard\StarCraft II'
+os.environ["SC2PATH"] = 'J:\Blizzard\StarCraft II'
 
 HEADLESS = True
 
@@ -64,7 +64,7 @@ class Botty(sc2.BotAI):
                 f.write("Random {} -{}\n".format(game_result, int(time.time())))
         if game_result == Result.Victory:
 
-            filename = os.path.realpath(__file__) + "train_data/{}.npy".format(str(int(time.time())))
+            filename = "train_data/{}.npy".format(str(int(time.time())))
             np.save(filename, np.array(self.train_data))    
         
         if game_result == Result.Defeat:
@@ -399,14 +399,17 @@ class Botty(sc2.BotAI):
                 choice = random.choice(choice_weights)
 
 
-            try:
-                await self.choices[choice]()
-            except Exception as e:
-                print(str(e))
+                try:
+                    await self.choices[choice]()
+                    shouldContinue = False
+                except Exception as e:
+                    #print(str(e))
+                    pass
 
             y = np.zeros(17)
             y[choice] = 1
-            self.train_data.append([y, self.flipped])
+            currentGame = self.flipped
+            self.train_data.append([y, currentGame])
 
 
 
