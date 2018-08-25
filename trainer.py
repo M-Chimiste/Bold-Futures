@@ -12,6 +12,7 @@ import os
 import random
 import cv2
 import time
+import datetime
 
 
 def get_session(gpu_fraction=0.75):
@@ -22,7 +23,7 @@ backend.set_session(get_session())
 
 model = Sequential()
 model.add(Conv2D(32, (7, 7), padding='same',
-                 input_shape=(176, 200, 1),
+                 input_shape=(176, 200, 3),
                  activation='relu'))
 model.add(Conv2D(32, (3, 3), activation='relu'))
 model.add(MaxPooling2D(pool_size=(2, 2)))
@@ -56,7 +57,7 @@ tensorboard = TensorBoard(log_dir="logs/STAGE2-{}-{}".format(int(time.time()), l
 
 train_data_dir = "train_data"
 
-#model = keras.models.load_model('BasicCNN-5000-epochs-0.001-LR-STAGE2')
+model = keras.models.load_model('BasicCNN-5000-epochs-0.001-LR-STAGE2')
 
 
 def check_data(choices):
@@ -72,11 +73,11 @@ def check_data(choices):
     return lengths
 
 
-hm_epochs = 10
+hm_epochs = 100
 
 for i in range(hm_epochs):
     current = 0
-    increment = 30
+    increment = 50
     not_maximum = True
     all_files = os.listdir(train_data_dir)
     maximum = len(all_files)
@@ -85,6 +86,7 @@ for i in range(hm_epochs):
     while not_maximum:
         try:
             print("WORKING ON {}:{}, EPOCH:{}".format(current, current+increment, i))
+            print(datetime.datetime.now())
 
             choices = {
                 0: [],
@@ -137,13 +139,13 @@ for i in range(hm_epochs):
             print(len(train_data))
 
             test_size = 100
-            batch_size = 128  # 128 best so far.
+            batch_size = 100  # 128 best so far.
 
             
-            x_train = np.array([i[1] for i in train_data[:-test_size]]).reshape(-1, 176, 200, 1)
+            x_train = np.array([i[1] for i in train_data[:-test_size]]).reshape(-1, 176, 200, 3)
             y_train = np.array([i[0] for i in train_data[:-test_size]])
 
-            x_test = np.array([i[1] for i in train_data[-test_size:]]).reshape(-1, 176, 200, 1)
+            x_test = np.array([i[1] for i in train_data[-test_size:]]).reshape(-1, 176, 200, 3)
             y_test = np.array([i[0] for i in train_data[-test_size:]])
             
             model.fit(x_train, y_train,
