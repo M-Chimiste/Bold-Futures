@@ -1,5 +1,3 @@
-# Taken from pythonprogamming.net and converted for own use.
-
 import tensorflow as tf
 import keras.backend.tensorflow_backend as backend
 import keras  # Keras 2.1.2 and TF-GPU 1.9.0
